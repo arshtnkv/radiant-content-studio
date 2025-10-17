@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNavigate } from 'react-router-dom';
 
 interface ContentBlock {
   id: string;
@@ -13,7 +12,6 @@ interface ContentBlock {
 }
 
 const Index = () => {
-  const navigate = useNavigate();
   const [page, setPage] = useState<any>(null);
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
