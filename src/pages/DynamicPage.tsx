@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useNavigate } from 'react-router-dom';
 
 interface ContentBlock {
   id: string;
@@ -12,28 +12,30 @@ interface ContentBlock {
   position: number;
 }
 
-const Index = () => {
-  const navigate = useNavigate();
+export default function DynamicPage() {
+  const { slug } = useParams();
   const [page, setPage] = useState<any>(null);
   const [blocks, setBlocks] = useState<ContentBlock[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchHomePage = async () => {
-      const { data: homePageData } = await supabase
+    const fetchPageData = async () => {
+      if (!slug) return;
+
+      const { data: pageData } = await supabase
         .from('pages')
         .select('*')
-        .eq('is_home', true)
+        .eq('slug', slug)
         .eq('is_published', true)
         .single();
 
-      if (homePageData) {
-        setPage(homePageData);
+      if (pageData) {
+        setPage(pageData);
 
         const { data: blocksData } = await supabase
           .from('content_blocks')
           .select('*')
-          .eq('page_id', homePageData.id)
+          .eq('page_id', pageData.id)
           .order('position', { ascending: true });
 
         setBlocks(blocksData || []);
@@ -42,8 +44,8 @@ const Index = () => {
       setLoading(false);
     };
 
-    fetchHomePage();
-  }, []);
+    fetchPageData();
+  }, [slug]);
 
   if (loading) {
     return (
@@ -60,18 +62,11 @@ const Index = () => {
 
   if (!page) {
     return (
-      <div className="min-h-screen" style={{ background: 'var(--gradient-subtle)' }}>
+      <div className="min-h-screen bg-background">
         <Header />
-        <div className="container max-w-4xl py-24 px-4 text-center">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Добро пожаловать!
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8">
-            Это ваш новый сайт с системой управления контентом.
-          </p>
-          <p className="text-muted-foreground">
-            Главная страница еще не настроена. Войдите в админ-панель для создания контента.
-          </p>
+        <div className="container max-w-4xl py-12 px-4 text-center">
+          <h1 className="text-4xl font-bold mb-4">Страница не найдена</h1>
+          <p className="text-muted-foreground">Запрошенная страница не существует.</p>
         </div>
       </div>
     );
@@ -108,6 +103,4 @@ const Index = () => {
       </div>
     </div>
   );
-};
-
-export default Index;
+}

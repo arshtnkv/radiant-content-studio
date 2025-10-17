@@ -1,0 +1,17 @@
+.ql-container {
+  font-size: 16px;
+  min-height: 200px;
+}
+
+.ql-editor {
+  min-height: 200px;
+}
+
+.ql-toolbar {
+  background: hsl(var(--muted));
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.ql-container {
+  border-radius: 0 0 var(--radius) var(--radius);
+}
