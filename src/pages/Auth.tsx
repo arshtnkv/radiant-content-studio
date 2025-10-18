@@ -18,9 +18,8 @@ const authSchema = z.object({
 export default function Auth() {
   const navigate = useNavigate();
   const { user } = useAppSelector(state => state.auth);
-  const [isLogin, setIsLogin] = useState(true);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState('admin@admin.com');
+  const [password, setPassword] = useState('root');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -36,46 +35,22 @@ export default function Auth() {
     try {
       const validated = authSchema.parse({ email, password });
 
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: validated.email,
-          password: validated.password,
-        });
+      const { error } = await supabase.auth.signInWithPassword({
+        email: validated.email,
+        password: validated.password,
+      });
 
-        if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Неверный email или пароль');
-          } else {
-            toast.error(error.message);
-          }
-          return;
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Неверный логин или пароль');
+        } else {
+          toast.error(error.message);
         }
-
-        toast.success('Успешный вход!');
-        navigate('/');
-      } else {
-        const redirectUrl = `${window.location.origin}/`;
-        
-        const { error } = await supabase.auth.signUp({
-          email: validated.email,
-          password: validated.password,
-          options: {
-            emailRedirectTo: redirectUrl
-          }
-        });
-
-        if (error) {
-          if (error.message.includes('already registered')) {
-            toast.error('Этот email уже зарегистрирован');
-          } else {
-            toast.error(error.message);
-          }
-          return;
-        }
-
-        toast.success('Регистрация успешна! Проверьте email для подтверждения.');
-        setIsLogin(true);
+        return;
       }
+
+      toast.success('Успешный вход!');
+      navigate('/');
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
@@ -92,12 +67,10 @@ export default function Auth() {
       <Card className="w-full max-w-md shadow-lg" style={{ boxShadow: 'var(--shadow-elegant)' }}>
         <CardHeader>
           <CardTitle className="text-2xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            {isLogin ? 'Вход' : 'Регистрация'}
+            Вход в админ-панель
           </CardTitle>
           <CardDescription>
-            {isLogin 
-              ? 'Войдите в свой аккаунт' 
-              : 'Создайте новый аккаунт'}
+            Войдите используя учетные данные администратора
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -133,15 +106,7 @@ export default function Auth() {
               disabled={loading}
               style={{ background: 'var(--gradient-primary)' }}
             >
-              {loading ? 'Загрузка...' : isLogin ? 'Войти' : 'Зарегистрироваться'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full"
-              onClick={() => setIsLogin(!isLogin)}
-            >
-              {isLogin ? 'Нет аккаунта? Зарегистрируйтесь' : 'Уже есть аккаунт? Войдите'}
+              {loading ? 'Загрузка...' : 'Войти'}
             </Button>
           </form>
         </CardContent>
