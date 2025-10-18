@@ -35,12 +35,25 @@ export default function Auth() {
     try {
       const validated = authSchema.parse({ login, password });
 
-      const { data, error } = await supabase.functions.invoke('admin-auth', {
-        body: { login: validated.login, password: validated.password }
+      // Для админа используем фиксированный email
+      if (validated.login !== 'admin') {
+        toast.error('Неверный логин');
+        setLoading(false);
+        return;
+      }
+
+      // Входим через Supabase Auth с фиксированным email для админа
+      const { error } = await supabase.auth.signInWithPassword({
+        email: 'admin@admin.com',
+        password: validated.password,
       });
 
-      if (error || !data?.success) {
-        toast.error(data?.error || 'Неверный логин или пароль');
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Неверный логин или пароль');
+        } else {
+          toast.error(error.message);
+        }
         return;
       }
 
