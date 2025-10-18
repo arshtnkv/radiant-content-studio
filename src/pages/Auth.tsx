@@ -11,14 +11,14 @@ import { useAppSelector } from '@/store/hooks';
 import { useEffect } from 'react';
 
 const authSchema = z.object({
-  email: z.string().trim().email({ message: "Некорректный email" }).max(255),
-  password: z.string().min(6, { message: "Пароль должен быть минимум 6 символов" }).max(100),
+  login: z.string().trim().min(1, { message: "Логин не может быть пустым" }).max(100),
+  password: z.string().min(1, { message: "Пароль не может быть пустым" }).max(100),
 });
 
 export default function Auth() {
   const navigate = useNavigate();
   const { user } = useAppSelector(state => state.auth);
-  const [email, setEmail] = useState('admin@admin.com');
+  const [login, setLogin] = useState('admin');
   const [password, setPassword] = useState('root');
   const [loading, setLoading] = useState(false);
 
@@ -33,19 +33,14 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      const validated = authSchema.parse({ email, password });
+      const validated = authSchema.parse({ login, password });
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email: validated.email,
-        password: validated.password,
+      const { data, error } = await supabase.functions.invoke('admin-auth', {
+        body: { login: validated.login, password: validated.password }
       });
 
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Неверный логин или пароль');
-        } else {
-          toast.error(error.message);
-        }
+      if (error || !data?.success) {
+        toast.error(data?.error || 'Неверный логин или пароль');
         return;
       }
 
@@ -76,15 +71,15 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="login">Логин</Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="login"
+                type="text"
+                placeholder="admin"
+                value={login}
+                onChange={(e) => setLogin(e.target.value)}
                 required
-                maxLength={255}
+                maxLength={100}
               />
             </div>
             <div className="space-y-2">
