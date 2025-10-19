@@ -1,9 +1,9 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useAppSelector, useAppDispatch } from '@/store/hooks';
-import { supabase } from '@/integrations/supabase/client';
 import { logout } from '@/store/slices/authSlice';
 import { Settings, LogOut, Home } from 'lucide-react';
+import { apiClient } from '@/lib/api-client';
 
 export const Header = () => {
   const navigate = useNavigate();
@@ -12,7 +12,7 @@ export const Header = () => {
   const { logoUrl, siteName } = useAppSelector(state => state.settings);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
+    await apiClient.logout();
     dispatch(logout());
     navigate('/');
   };

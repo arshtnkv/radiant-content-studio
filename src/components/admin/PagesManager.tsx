@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Home, Eye } from 'lucide-react';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,13 +31,14 @@ export const PagesManager = () => {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const fetchPages = async () => {
-    const { data } = await supabase
-      .from('pages')
-      .select('*')
-      .order('created_at', { ascending: false });
-    
-    setPages(data || []);
-    setLoading(false);
+    try {
+      const data = await apiClient.getPages({});
+      setPages(data || []);
+    } catch (error) {
+      toast.error('Ошибка при загрузке страниц');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -45,53 +46,52 @@ export const PagesManager = () => {
   }, []);
 
   const handleSetHome = async (pageId: string) => {
-    await supabase
-      .from('pages')
-      .update({ is_home: false })
-      .neq('id', pageId);
+    try {
+      // Сначала обновляем все страницы, убирая is_home
+      for (const page of pages) {
+        if (page.id !== pageId && page.is_home) {
+          await apiClient.updatePage(page.id, { ...page, is_home: false });
+        }
+      }
 
-    const { error } = await supabase
-      .from('pages')
-      .update({ is_home: true })
-      .eq('id', pageId);
+      // Затем устанавливаем is_home для выбранной страницы
+      const targetPage = pages.find(p => p.id === pageId);
+      if (targetPage) {
+        await apiClient.updatePage(pageId, { ...targetPage, is_home: true });
+      }
 
-    if (error) {
-      toast.error('Ошибка при установке главной страницы');
-    } else {
       toast.success('Главная страница установлена');
       fetchPages();
+    } catch (error) {
+      toast.error('Ошибка при установке главной страницы');
     }
   };
 
   const handleDelete = async () => {
     if (!deleteId) return;
 
-    const { error } = await supabase
-      .from('pages')
-      .delete()
-      .eq('id', deleteId);
-
-    if (error) {
-      toast.error('Ошибка при удалении страницы');
-    } else {
+    try {
+      await apiClient.deletePage(deleteId);
       toast.success('Страница удалена');
       fetchPages();
+    } catch (error) {
+      toast.error('Ошибка при удалении страницы');
     }
     
     setDeleteId(null);
   };
 
   const handleTogglePublish = async (page: Page) => {
-    const { error } = await supabase
-      .from('pages')
-      .update({ is_published: !page.is_published })
-      .eq('id', page.id);
+    try {
+      await apiClient.updatePage(page.id, {
+        ...page,
+        is_published: !page.is_published
+      });
 
-    if (error) {
-      toast.error('Ошибка при изменении статуса публикации');
-    } else {
       toast.success(page.is_published ? 'Страница снята с публикации' : 'Страница опубликована');
       fetchPages();
+    } catch (error) {
+      toast.error('Ошибка при изменении статуса публикации');
     }
   };
 

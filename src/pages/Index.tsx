@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiClient } from '@/lib/api-client';
 
 interface ContentBlock {
   id: string;
@@ -18,26 +18,20 @@ const Index = () => {
 
   useEffect(() => {
     const fetchHomePage = async () => {
-      const { data: homePageData } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('is_home', true)
-        .eq('is_published', true)
-        .single();
+      try {
+        const pages = await apiClient.getPages({ is_home: true, is_published: true });
+        const homePageData = pages[0];
 
-      if (homePageData) {
-        setPage(homePageData);
-
-        const { data: blocksData } = await supabase
-          .from('content_blocks')
-          .select('*')
-          .eq('page_id', homePageData.id)
-          .order('position', { ascending: true });
-
-        setBlocks(blocksData || []);
+        if (homePageData) {
+          setPage(homePageData);
+          const blocksData = await apiClient.getPageBlocks(homePageData.id);
+          setBlocks(blocksData || []);
+        }
+      } catch (error) {
+        console.error('Error fetching home page:', error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchHomePage();

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Header } from '@/components/Header';
 import { Skeleton } from '@/components/ui/skeleton';
+import { apiClient } from '@/lib/api-client';
 
 interface ContentBlock {
   id: string;
@@ -22,26 +22,17 @@ export default function DynamicPage() {
     const fetchPageData = async () => {
       if (!slug) return;
 
-      const { data: pageData } = await supabase
-        .from('pages')
-        .select('*')
-        .eq('slug', slug)
-        .eq('is_published', true)
-        .single();
-
-      if (pageData) {
+      try {
+        const pageData = await apiClient.getPageBySlug(slug);
         setPage(pageData);
 
-        const { data: blocksData } = await supabase
-          .from('content_blocks')
-          .select('*')
-          .eq('page_id', pageData.id)
-          .order('position', { ascending: true });
-
+        const blocksData = await apiClient.getPageBlocks(pageData.id);
         setBlocks(blocksData || []);
+      } catch (error) {
+        console.error('Error fetching page:', error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchPageData();

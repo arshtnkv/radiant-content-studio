@@ -1,80 +1,45 @@
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { useAppDispatch } from '@/store/hooks';
 import { setAuth, setLoading } from '@/store/slices/authSlice';
 import { setSettings } from '@/store/slices/settingsSlice';
+import { apiClient } from '@/lib/api-client';
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
-    // Загружаем настройки сайта
-    const fetchSettings = async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('*')
-        .single();
-
-      if (data) {
+    const initAuth = async () => {
+      try {
+        // Загружаем настройки сайта
+        const settings = await apiClient.getSettings();
         dispatch(setSettings({
-          siteName: data.site_name,
-          logoUrl: data.logo_url
+          siteName: settings.site_name,
+          logoUrl: settings.logo_url
         }));
+
+        // Проверяем аутентификацию
+        if (apiClient.isAuthenticated()) {
+          const user = await apiClient.getCurrentUser();
+          if (user) {
+            const isAdmin = await apiClient.checkAdmin();
+            dispatch(setAuth({
+              user,
+              session: { access_token: localStorage.getItem('access_token') } as any,
+              isAdmin
+            }));
+          } else {
+            dispatch(setLoading(false));
+          }
+        } else {
+          dispatch(setLoading(false));
+        }
+      } catch (error) {
+        console.error('Auth initialization error:', error);
+        dispatch(setLoading(false));
       }
     };
 
-    fetchSettings();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        const user = session?.user ?? null;
-        
-        if (user) {
-          setTimeout(async () => {
-            const { data: roleData } = await supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', user.id)
-              .eq('role', 'admin')
-              .single();
-            
-            dispatch(setAuth({
-              user,
-              session,
-              isAdmin: !!roleData
-            }));
-          }, 0);
-        } else {
-          dispatch(setAuth({
-            user: null,
-            session: null,
-            isAdmin: false
-          }));
-        }
-      }
-    );
-
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const user = session?.user ?? null;
-      
-      if (user) {
-        const { data: roleData } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .single();
-        
-        dispatch(setAuth({
-          user,
-          session,
-          isAdmin: !!roleData
-        }));
-      } else {
-        dispatch(setLoading(false));
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    initAuth();
   }, [dispatch]);
 
   return <>{children}</>;

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,6 +7,7 @@ import { toast } from 'sonner';
 import { Upload, X } from 'lucide-react';
 import { useAppDispatch } from '@/store/hooks';
 import { setSettings } from '@/store/slices/settingsSlice';
+import { apiClient } from '@/lib/api-client';
 
 export const SiteSettings = () => {
   const dispatch = useAppDispatch();
@@ -18,14 +18,12 @@ export const SiteSettings = () => {
 
   useEffect(() => {
     const fetchSettings = async () => {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('*')
-        .single();
-
-      if (data) {
+      try {
+        const data = await apiClient.getSettings();
         setSiteName(data.site_name);
         setLogoUrl(data.logo_url);
+      } catch (error) {
+        toast.error('Ошибка при загрузке настроек');
       }
     };
 
@@ -37,26 +35,15 @@ export const SiteSettings = () => {
     if (!file) return;
 
     setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `logo-${Date.now()}.${fileExt}`;
-
-    const { error: uploadError, data } = await supabase.storage
-      .from('images')
-      .upload(fileName, file);
-
-    if (uploadError) {
+    try {
+      const result = await apiClient.uploadImage(file);
+      setLogoUrl(result.url);
+      toast.success('Логотип загружен');
+    } catch (error) {
       toast.error('Ошибка при загрузке логотипа');
+    } finally {
       setUploading(false);
-      return;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(fileName);
-
-    setLogoUrl(publicUrl);
-    setUploading(false);
-    toast.success('Логотип загружен');
   };
 
   const handleRemoveLogo = () => {
@@ -66,27 +53,19 @@ export const SiteSettings = () => {
   const handleSave = async () => {
     setLoading(true);
 
-    const { data: settings } = await supabase
-      .from('site_settings')
-      .select('id')
-      .single();
-
-    const { error } = await supabase
-      .from('site_settings')
-      .update({
+    try {
+      await apiClient.updateSettings({
         site_name: siteName,
         logo_url: logoUrl,
-      })
-      .eq('id', settings?.id);
+      });
 
-    if (error) {
-      toast.error('Ошибка при сохранении настроек');
-    } else {
       toast.success('Настройки сохранены');
       dispatch(setSettings({ siteName, logoUrl }));
+    } catch (error) {
+      toast.error('Ошибка при сохранении настроек');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (

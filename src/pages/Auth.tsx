@@ -1,25 +1,26 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useAppSelector, useAppDispatch } from '@/store/hooks';
+import { setAuth } from '@/store/slices/authSlice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { useAppSelector } from '@/store/hooks';
-import { useEffect } from 'react';
+import { apiClient } from '@/lib/api-client';
 
 const authSchema = z.object({
-  login: z.string().trim().min(1, { message: "Логин не может быть пустым" }).max(100),
-  password: z.string().min(1, { message: "Пароль не может быть пустым" }).max(100),
+  login: z.string().email('Введите корректный email'),
+  password: z.string().min(6, 'Пароль должен содержать минимум 6 символов'),
 });
 
 export default function Auth() {
   const navigate = useNavigate();
+  const dispatch = useAppDispatch();
   const { user } = useAppSelector(state => state.auth);
-  const [login, setLogin] = useState('admin');
-  const [password, setPassword] = useState('root');
+  const [login, setLogin] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -35,35 +36,29 @@ export default function Auth() {
     try {
       const validated = authSchema.parse({ login, password });
 
-      // Для админа используем фиксированный email
-      if (validated.login !== 'admin') {
-        toast.error('Неверный логин');
-        setLoading(false);
-        return;
-      }
+      const response = await apiClient.login(validated.login, validated.password);
+      
+      const isAdmin = await apiClient.checkAdmin();
+      
+      dispatch(setAuth({
+        user: response.user,
+        session: { access_token: response.access_token },
+        isAdmin
+      }));
 
-      // Входим через Supabase Auth с фиксированным email для админа
-      const { error } = await supabase.auth.signInWithPassword({
-        email: 'admin@admin.com',
-        password: validated.password,
-      });
-
-      if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Неверный логин или пароль');
-        } else {
-          toast.error(error.message);
-        }
-        return;
-      }
-
-      toast.success('Успешный вход!');
-      navigate('/');
+      toast.success('Вход выполнен успешно');
+      navigate('/admin');
     } catch (error) {
       if (error instanceof z.ZodError) {
         toast.error(error.errors[0].message);
+      } else if (error instanceof Error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Неверный email или пароль');
+        } else {
+          toast.error(error.message);
+        }
       } else {
-        toast.error('Произошла ошибка');
+        toast.error('Произошла ошибка при входе');
       }
     } finally {
       setLoading(false);
@@ -84,15 +79,14 @@ export default function Auth() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="login">Логин</Label>
+              <Label htmlFor="login">Email</Label>
               <Input
                 id="login"
-                type="text"
-                placeholder="admin"
+                type="email"
+                placeholder="admin@admin.com"
                 value={login}
                 onChange={(e) => setLogin(e.target.value)}
                 required
-                maxLength={100}
               />
             </div>
             <div className="space-y-2">
@@ -105,7 +99,6 @@ export default function Auth() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
-                maxLength={100}
               />
             </div>
             <Button 

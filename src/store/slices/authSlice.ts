@@ -1,5 +1,13 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-import { User, Session } from '@supabase/supabase-js';
+
+interface User {
+  id: string;
+  email: string;
+}
+
+interface Session {
+  access_token: string;
+}
 
 interface AuthState {
   user: User | null;

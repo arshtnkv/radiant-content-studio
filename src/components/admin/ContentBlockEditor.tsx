@@ -5,8 +5,8 @@ import { Trash2, Upload, Image as ImageIcon } from 'lucide-react';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import './quill-custom.css';
-import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { apiClient } from '@/lib/api-client';
 
 interface ContentBlock {
   type: 'text' | 'image';
@@ -41,26 +41,15 @@ export const ContentBlockEditor = ({ block, index, onUpdate, onDelete }: Props) 
     if (!file) return;
 
     setUploading(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `block-${Date.now()}.${fileExt}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('images')
-      .upload(fileName, file);
-
-    if (uploadError) {
+    try {
+      const result = await apiClient.uploadImage(file);
+      onUpdate(index, { image_url: result.url });
+      toast.success('Изображение загружено');
+    } catch (error) {
       toast.error('Ошибка при загрузке изображения');
+    } finally {
       setUploading(false);
-      return;
     }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('images')
-      .getPublicUrl(fileName);
-
-    onUpdate(index, { image_url: publicUrl });
-    setUploading(false);
-    toast.success('Изображение загружено');
   };
 
   return (

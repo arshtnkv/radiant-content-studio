@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -10,6 +9,7 @@ import { toast } from 'sonner';
 import { ArrowLeft, Plus, Save } from 'lucide-react';
 import { ContentBlockEditor } from '@/components/admin/ContentBlockEditor';
 import { useAppSelector } from '@/store/hooks';
+import { apiClient } from '@/lib/api-client';
 
 interface ContentBlock {
   id?: string;
@@ -38,30 +38,26 @@ export default function PageEditor() {
 
     if (!isNew && pageId) {
       const fetchPage = async () => {
-        const { data: pageData } = await supabase
-          .from('pages')
-          .select('*')
-          .eq('id', pageId)
-          .single();
+        try {
+          const pages = await apiClient.getPages({});
+          const pageData = pages.find(p => p.id === pageId);
 
-        if (pageData) {
-          setTitle(pageData.title);
-          setSlug(pageData.slug);
+          if (pageData) {
+            setTitle(pageData.title);
+            setSlug(pageData.slug);
 
-          const { data: blocksData } = await supabase
-            .from('content_blocks')
-            .select('*')
-            .eq('page_id', pageId)
-            .order('position', { ascending: true });
-
-          setBlocks((blocksData || []).map(block => ({
-            id: block.id,
-            type: block.type as 'text' | 'image',
-            content: block.content,
-            image_url: block.image_url,
-            position: block.position,
-            page_id: block.page_id
-          })));
+            const blocksData = await apiClient.getPageBlocks(pageId);
+            setBlocks((blocksData || []).map(block => ({
+              id: block.id,
+              type: block.type as 'text' | 'image',
+              content: block.content,
+              image_url: block.image_url,
+              position: block.position,
+              page_id: block.page_id
+            })));
+          }
+        } catch (error) {
+          toast.error('Ошибка при загрузке страницы');
         }
       };
 
@@ -101,46 +97,32 @@ export default function PageEditor() {
       let pageIdToUse = pageId;
 
       if (isNew) {
-        const { data: newPage, error: pageError } = await supabase
-          .from('pages')
-          .insert({
-            title,
-            slug,
-            is_published: true,
-          })
-          .select()
-          .single();
-
-        if (pageError) throw pageError;
+        const newPage = await apiClient.createPage({
+          title,
+          slug,
+          is_published: true,
+          is_home: false,
+        });
         pageIdToUse = newPage.id;
       } else {
-        const { error: updateError } = await supabase
-          .from('pages')
-          .update({ title, slug })
-          .eq('id', pageId);
-
-        if (updateError) throw updateError;
-
-        await supabase
-          .from('content_blocks')
-          .delete()
-          .eq('page_id', pageId);
+        await apiClient.updatePage(pageId!, {
+          title,
+          slug,
+          is_published: true,
+          is_home: false,
+        });
       }
 
-      if (blocks.length > 0) {
-        const blocksToInsert = blocks.map((block, index) => ({
-          page_id: pageIdToUse,
+      if (blocks.length > 0 && pageIdToUse) {
+        const blocksToUpsert = blocks.map((block, index) => ({
+          id: block.id || null,
           type: block.type,
           content: block.content,
           image_url: block.image_url,
           position: index,
         }));
 
-        const { error: blocksError } = await supabase
-          .from('content_blocks')
-          .insert(blocksToInsert);
-
-        if (blocksError) throw blocksError;
+        await apiClient.upsertBlocks(pageIdToUse, blocksToUpsert);
       }
 
       toast.success('Страница сохранена');
